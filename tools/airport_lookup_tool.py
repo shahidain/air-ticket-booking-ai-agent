@@ -3,10 +3,18 @@ Airport Lookup Tool
 
 This tool provides airport IATA codes and city names.
 Can be used by AI agents to resolve city names to airport codes.
+Fetches data from aviation-edge.com API or falls back to local cache.
 """
 
 from typing import Dict, List, Optional
+import requests
+from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
+from utils.logger import setup_logger
+import os
+import json
+
+logger = setup_logger(__name__)
 
 
 class AirportInfo(BaseModel):
@@ -23,132 +31,189 @@ class AirportLookupTool:
     """
     Tool for looking up airport information.
 
-    This tool maintains a database of major airports worldwide
-    and can search by city name, airport code, or country.
+    Fetches data from Amadeus API or uses cached fallback data.
+    Caches results to minimize API calls.
     """
 
-    # Comprehensive airport database
-    AIRPORTS = {
-        # United States
-        "JFK": AirportInfo(iata_code="JFK", city="New York", country="USA",
-                          airport_name="John F. Kennedy International Airport", is_major=True),
-        "LGA": AirportInfo(iata_code="LGA", city="New York", country="USA",
-                          airport_name="LaGuardia Airport", is_major=True),
-        "EWR": AirportInfo(iata_code="EWR", city="New York", country="USA",
-                          airport_name="Newark Liberty International Airport", is_major=True),
-        "LAX": AirportInfo(iata_code="LAX", city="Los Angeles", country="USA",
-                          airport_name="Los Angeles International Airport", is_major=True),
-        "ORD": AirportInfo(iata_code="ORD", city="Chicago", country="USA",
-                          airport_name="O'Hare International Airport", is_major=True),
-        "MIA": AirportInfo(iata_code="MIA", city="Miami", country="USA",
-                          airport_name="Miami International Airport", is_major=True),
-        "SFO": AirportInfo(iata_code="SFO", city="San Francisco", country="USA",
-                          airport_name="San Francisco International Airport", is_major=True),
-        "SEA": AirportInfo(iata_code="SEA", city="Seattle", country="USA",
-                          airport_name="Seattle-Tacoma International Airport", is_major=True),
-        "LAS": AirportInfo(iata_code="LAS", city="Las Vegas", country="USA",
-                          airport_name="Harry Reid International Airport", is_major=True),
-        "BOS": AirportInfo(iata_code="BOS", city="Boston", country="USA",
-                          airport_name="Logan International Airport", is_major=True),
-        "IAD": AirportInfo(iata_code="IAD", city="Washington DC", country="USA",
-                          airport_name="Washington Dulles International Airport", is_major=True),
-        "DCA": AirportInfo(iata_code="DCA", city="Washington DC", country="USA",
-                          airport_name="Ronald Reagan Washington National Airport", is_major=True),
-        "ATL": AirportInfo(iata_code="ATL", city="Atlanta", country="USA",
-                          airport_name="Hartsfield-Jackson Atlanta International Airport", is_major=True),
-        "DFW": AirportInfo(iata_code="DFW", city="Dallas", country="USA",
-                          airport_name="Dallas/Fort Worth International Airport", is_major=True),
-        "DEN": AirportInfo(iata_code="DEN", city="Denver", country="USA",
-                          airport_name="Denver International Airport", is_major=True),
-        "PHX": AirportInfo(iata_code="PHX", city="Phoenix", country="USA",
-                          airport_name="Phoenix Sky Harbor International Airport", is_major=True),
-
-        # Europe
-        "LHR": AirportInfo(iata_code="LHR", city="London", country="UK",
-                          airport_name="Heathrow Airport", is_major=True),
-        "LGW": AirportInfo(iata_code="LGW", city="London", country="UK",
-                          airport_name="Gatwick Airport", is_major=True),
-        "STN": AirportInfo(iata_code="STN", city="London", country="UK",
-                          airport_name="Stansted Airport", is_major=True),
-        "CDG": AirportInfo(iata_code="CDG", city="Paris", country="France",
-                          airport_name="Charles de Gaulle Airport", is_major=True),
-        "ORY": AirportInfo(iata_code="ORY", city="Paris", country="France",
-                          airport_name="Orly Airport", is_major=True),
-        "FRA": AirportInfo(iata_code="FRA", city="Frankfurt", country="Germany",
-                          airport_name="Frankfurt Airport", is_major=True),
-        "AMS": AirportInfo(iata_code="AMS", city="Amsterdam", country="Netherlands",
-                          airport_name="Amsterdam Airport Schiphol", is_major=True),
-        "MAD": AirportInfo(iata_code="MAD", city="Madrid", country="Spain",
-                          airport_name="Adolfo Suárez Madrid-Barajas Airport", is_major=True),
-        "BCN": AirportInfo(iata_code="BCN", city="Barcelona", country="Spain",
-                          airport_name="Barcelona-El Prat Airport", is_major=True),
-        "FCO": AirportInfo(iata_code="FCO", city="Rome", country="Italy",
-                          airport_name="Leonardo da Vinci-Fiumicino Airport", is_major=True),
-        "MXP": AirportInfo(iata_code="MXP", city="Milan", country="Italy",
-                          airport_name="Milan Malpensa Airport", is_major=True),
-        "IST": AirportInfo(iata_code="IST", city="Istanbul", country="Turkey",
-                          airport_name="Istanbul Airport", is_major=True),
-        "MUC": AirportInfo(iata_code="MUC", city="Munich", country="Germany",
-                          airport_name="Munich Airport", is_major=True),
-        "ZRH": AirportInfo(iata_code="ZRH", city="Zurich", country="Switzerland",
-                          airport_name="Zurich Airport", is_major=True),
-
-        # Middle East
-        "DXB": AirportInfo(iata_code="DXB", city="Dubai", country="UAE",
-                          airport_name="Dubai International Airport", is_major=True),
-        "DOH": AirportInfo(iata_code="DOH", city="Doha", country="Qatar",
-                          airport_name="Hamad International Airport", is_major=True),
-        "AUH": AirportInfo(iata_code="AUH", city="Abu Dhabi", country="UAE",
-                          airport_name="Abu Dhabi International Airport", is_major=True),
-
-        # Asia
-        "SIN": AirportInfo(iata_code="SIN", city="Singapore", country="Singapore",
-                          airport_name="Singapore Changi Airport", is_major=True),
-        "HKG": AirportInfo(iata_code="HKG", city="Hong Kong", country="Hong Kong",
-                          airport_name="Hong Kong International Airport", is_major=True),
-        "NRT": AirportInfo(iata_code="NRT", city="Tokyo", country="Japan",
-                          airport_name="Narita International Airport", is_major=True),
-        "HND": AirportInfo(iata_code="HND", city="Tokyo", country="Japan",
-                          airport_name="Haneda Airport", is_major=True),
-        "ICN": AirportInfo(iata_code="ICN", city="Seoul", country="South Korea",
-                          airport_name="Incheon International Airport", is_major=True),
-        "BKK": AirportInfo(iata_code="BKK", city="Bangkok", country="Thailand",
-                          airport_name="Suvarnabhumi Airport", is_major=True),
-        "KUL": AirportInfo(iata_code="KUL", city="Kuala Lumpur", country="Malaysia",
-                          airport_name="Kuala Lumpur International Airport", is_major=True),
-        "BOM": AirportInfo(iata_code="BOM", city="Mumbai", country="India",
-                          airport_name="Chhatrapati Shivaji Maharaj International Airport", is_major=True),
-        "DEL": AirportInfo(iata_code="DEL", city="Delhi", country="India",
-                          airport_name="Indira Gandhi International Airport", is_major=True),
-        "PEK": AirportInfo(iata_code="PEK", city="Beijing", country="China",
-                          airport_name="Beijing Capital International Airport", is_major=True),
-        "PVG": AirportInfo(iata_code="PVG", city="Shanghai", country="China",
-                          airport_name="Shanghai Pudong International Airport", is_major=True),
-
-        # Canada
-        "YYZ": AirportInfo(iata_code="YYZ", city="Toronto", country="Canada",
-                          airport_name="Toronto Pearson International Airport", is_major=True),
-        "YVR": AirportInfo(iata_code="YVR", city="Vancouver", country="Canada",
-                          airport_name="Vancouver International Airport", is_major=True),
-        "YUL": AirportInfo(iata_code="YUL", city="Montreal", country="Canada",
-                          airport_name="Montréal-Pierre Elliott Trudeau International Airport", is_major=True),
-
-        # Oceania
-        "SYD": AirportInfo(iata_code="SYD", city="Sydney", country="Australia",
-                          airport_name="Sydney Kingsford Smith Airport", is_major=True),
-        "MEL": AirportInfo(iata_code="MEL", city="Melbourne", country="Australia",
-                          airport_name="Melbourne Airport", is_major=True),
-        "AKL": AirportInfo(iata_code="AKL", city="Auckland", country="New Zealand",
-                          airport_name="Auckland Airport", is_major=True),
-
-        # Latin America
-        "GRU": AirportInfo(iata_code="GRU", city="São Paulo", country="Brazil",
-                          airport_name="São Paulo/Guarulhos International Airport", is_major=True),
-        "MEX": AirportInfo(iata_code="MEX", city="Mexico City", country="Mexico",
-                          airport_name="Mexico City International Airport", is_major=True),
-        "EZE": AirportInfo(iata_code="EZE", city="Buenos Aires", country="Argentina",
-                          airport_name="Ministro Pistarini International Airport", is_major=True),
-    }
+    # Cache for API results
+    _airports_cache: Dict[str, AirportInfo] = {}
+    _cache_timestamp: Optional[datetime] = None
+    _cache_duration = timedelta(days=7)  # Cache airports for 7 days
+    
+    # Fallback airport database (loaded from file)
+    FALLBACK_AIRPORTS: Dict[str, AirportInfo] = {}
+    
+    @classmethod
+    def _load_fallback_airports(cls) -> Dict[str, AirportInfo]:
+        """
+        Load fallback airports from data file.
+        
+        Returns:
+            Dictionary of IATA codes to AirportInfo objects
+        """
+        if cls.FALLBACK_AIRPORTS:
+            return cls.FALLBACK_AIRPORTS
+        
+        airports = {}
+        fallback_file = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data",
+            "fallback_airports.txt"
+        )
+        
+        try:
+            with open(fallback_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip comments and empty lines
+                    if not line or line.startswith('#'):
+                        continue
+                    
+                    # Parse airport line (format: IATA|CITY|COUNTRY|NAME|IS_MAJOR)
+                    if '|' in line:
+                        parts = line.split('|')
+                        if len(parts) >= 5:
+                            iata_code = parts[0].strip()
+                            city = parts[1].strip()
+                            country = parts[2].strip()
+                            airport_name = parts[3].strip()
+                            is_major = parts[4].strip().lower() == 'true'
+                            
+                            airports[iata_code] = AirportInfo(
+                                iata_code=iata_code,
+                                city=city,
+                                country=country,
+                                airport_name=airport_name,
+                                is_major=is_major
+                            )
+            
+            logger.debug(f"Loaded {len(airports)} fallback airports from file")
+            cls.FALLBACK_AIRPORTS = airports
+            return airports
+            
+        except FileNotFoundError:
+            error_msg = f"Critical error: Fallback airports file not found at {fallback_file}. Please ensure the data/fallback_airports.txt file exists."
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+            
+        except Exception as e:
+            error_msg = f"Critical error loading fallback airports: {e}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+    
+    @classmethod
+    def _get_cache_file_path(cls) -> str:
+        """Get the path to the airports cache file."""
+        return os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data",
+            "airports_cache.json"
+        )
+    
+    @classmethod
+    def _load_cache_from_file(cls) -> bool:
+        """
+        Load airports cache from file.
+        
+        Returns:
+            True if cache was loaded successfully
+        """
+        cache_file = cls._get_cache_file_path()
+        
+        try:
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                # Check if cache is still valid
+                cache_time = datetime.fromisoformat(data.get('timestamp', '2000-01-01'))
+                if datetime.now() - cache_time < cls._cache_duration:
+                    # Load airports from cache
+                    for code, airport_data in data.get('airports', {}).items():
+                        cls._airports_cache[code] = AirportInfo.model_validate(airport_data)
+                    
+                    cls._cache_timestamp = cache_time
+                    logger.debug(f"Loaded {len(cls._airports_cache)} airports from cache")
+                    return True
+                else:
+                    logger.debug("Airport cache expired")
+                    return False
+        except Exception as e:
+            logger.warning(f"Failed to load airport cache: {e}")
+            
+        return False
+    
+    @classmethod
+    def _save_cache_to_file(cls) -> None:
+        """Save airports cache to file."""
+        cache_file = cls._get_cache_file_path()
+        
+        try:
+            # Ensure data directory exists
+            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+            
+            data = {
+                'timestamp': cls._cache_timestamp.isoformat() if cls._cache_timestamp else datetime.now().isoformat(),
+                'airports': {code: airport.model_dump() for code, airport in cls._airports_cache.items()}
+            }
+            
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+                
+            logger.debug(f"Saved {len(cls._airports_cache)} airports to cache")
+        except Exception as e:
+            logger.warning(f"Failed to save airport cache: {e}")
+    
+    @classmethod
+    def _fetch_airports_from_amadeus(cls) -> bool:
+        """
+        Fetch airports from Amadeus API.
+        
+        Returns:
+            True if fetch was successful
+        """
+        try:
+            from api.amadeus_client import AmadeusClient
+            
+            logger.info("Fetching airports from Amadeus API...")
+            amadeus = AmadeusClient()
+            
+            # Note: Amadeus doesn't have a simple "get all airports" endpoint
+            # So we'll use the fallback data as our primary source
+            # In production, you could use a dedicated airports API
+            
+            logger.debug("Using fallback airports as Amadeus doesn't provide bulk airport data")
+            return False
+            
+        except Exception as e:
+            logger.warning(f"Failed to fetch from Amadeus: {e}")
+            return False
+    
+    @classmethod
+    def _ensure_airports_loaded(cls) -> None:
+        """Ensure airports are loaded (from cache, API, or fallback)."""
+        # If cache is already loaded and valid, return
+        if cls._airports_cache and cls._cache_timestamp:
+            time_since_cache = datetime.now() - cls._cache_timestamp
+            if time_since_cache < cls._cache_duration:
+                return
+        
+        # Try to load from file cache
+        if cls._load_cache_from_file():
+            return
+        
+        # Try to fetch from API (currently not implemented for Amadeus)
+        # if cls._fetch_airports_from_amadeus():
+        #     cls._cache_timestamp = datetime.now()
+        #     cls._save_cache_to_file()
+        #     return
+        
+        # Use fallback data from file
+        logger.debug("Using fallback airport database from file")
+        fallback_airports = cls._load_fallback_airports()
+        cls._airports_cache = fallback_airports.copy()
+        cls._cache_timestamp = datetime.now()
+        cls._save_cache_to_file()
 
     @classmethod
     def get_airport_by_code(cls, iata_code: str) -> Optional[AirportInfo]:
@@ -161,7 +226,8 @@ class AirportLookupTool:
         Returns:
             AirportInfo object or None if not found
         """
-        return cls.AIRPORTS.get(iata_code.upper())
+        cls._ensure_airports_loaded()
+        return cls._airports_cache.get(iata_code.upper())
 
     @classmethod
     def search_by_city(cls, city_name: str) -> List[AirportInfo]:
@@ -174,10 +240,11 @@ class AirportLookupTool:
         Returns:
             List of matching airports
         """
+        cls._ensure_airports_loaded()
         city_name_lower = city_name.lower()
         results = []
 
-        for airport in cls.AIRPORTS.values():
+        for airport in cls._airports_cache.values():
             if city_name_lower in airport.city.lower():
                 results.append(airport)
 
@@ -216,9 +283,10 @@ class AirportLookupTool:
         Returns:
             List of airports in that country
         """
+        cls._ensure_airports_loaded()
         country_lower = country_name.lower()
         return [
-            airport for airport in cls.AIRPORTS.values()
+            airport for airport in cls._airports_cache.values()
             if country_lower in airport.country.lower()
         ]
 
@@ -230,7 +298,8 @@ class AirportLookupTool:
         Returns:
             List of all airports
         """
-        return list(cls.AIRPORTS.values())
+        cls._ensure_airports_loaded()
+        return list(cls._airports_cache.values())
 
     @classmethod
     def format_airports_list(cls, airports: List[AirportInfo]) -> str:

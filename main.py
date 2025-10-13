@@ -12,8 +12,6 @@ logger = setup_logger(__name__)
 
 async def main():
     """Main function to run the flight booking system."""
-    logger.info("Starting AI Ticket Booking System...")
-    
     print("\n" + "="*60)
     print("✈️  WELCOME TO AI TICKET BOOKING SYSTEM")
     print("="*60)
@@ -40,13 +38,11 @@ async def main():
         # Execute the workflow
         result = await workflow.run(user_prompt)
 
-        logger.info("Booking process completed successfully!")
         print("\n" + "="*50)
         print("BOOKING COMPLETED")
         print("="*50)
 
     except KeyboardInterrupt:
-        logger.info("Booking process cancelled by user")
         print("\n" + "="*50)
         print("BOOKING CANCELLED")
         print("="*50)

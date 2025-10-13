@@ -87,6 +87,9 @@ bookings/
 reports/
 exports/
 
+# Cache files
+data/airports_cache.json
+
 # Temporary files
 *.tmp
 *.bak

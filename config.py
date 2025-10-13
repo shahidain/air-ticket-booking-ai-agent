@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     # Application Configuration
     log_level: str = "INFO"
     environment: Literal["development", "production"] = "development"
+    
+    # Currency Configuration
+    local_currency: str = "USD"  # User's preferred currency (USD, EUR, GBP, INR, etc.)
+    enable_currency_conversion: bool = True  # Enable automatic currency conversion
+    exchange_rate_api_url: str = "https://open.er-api.com/v6/latest"  # Exchange rate API base URL
 
     class Config:
         env_file = ".env"

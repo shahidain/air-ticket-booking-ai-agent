@@ -1,0 +1,70 @@
+# Fallback Airport Database
+# Format: IATA_CODE|CITY|COUNTRY|AIRPORT_NAME|IS_MAJOR
+# Updated: October 2025
+
+# United States
+JFK|New York|USA|John F. Kennedy International Airport|true
+LGA|New York|USA|LaGuardia Airport|true
+EWR|New York|USA|Newark Liberty International Airport|true
+LAX|Los Angeles|USA|Los Angeles International Airport|true
+ORD|Chicago|USA|O'Hare International Airport|true
+MIA|Miami|USA|Miami International Airport|true
+SFO|San Francisco|USA|San Francisco International Airport|true
+SEA|Seattle|USA|Seattle-Tacoma International Airport|true
+LAS|Las Vegas|USA|Harry Reid International Airport|true
+BOS|Boston|USA|Logan International Airport|true
+IAD|Washington DC|USA|Washington Dulles International Airport|true
+DCA|Washington DC|USA|Ronald Reagan Washington National Airport|true
+ATL|Atlanta|USA|Hartsfield-Jackson Atlanta International Airport|true
+DFW|Dallas|USA|Dallas/Fort Worth International Airport|true
+DEN|Denver|USA|Denver International Airport|true
+PHX|Phoenix|USA|Phoenix Sky Harbor International Airport|true
+
+# Europe
+LHR|London|UK|Heathrow Airport|true
+LGW|London|UK|Gatwick Airport|true
+STN|London|UK|Stansted Airport|true
+CDG|Paris|France|Charles de Gaulle Airport|true
+ORY|Paris|France|Orly Airport|true
+FRA|Frankfurt|Germany|Frankfurt Airport|true
+AMS|Amsterdam|Netherlands|Amsterdam Airport Schiphol|true
+MAD|Madrid|Spain|Adolfo Suárez Madrid-Barajas Airport|true
+BCN|Barcelona|Spain|Barcelona-El Prat Airport|true
+FCO|Rome|Italy|Leonardo da Vinci-Fiumicino Airport|true
+MXP|Milan|Italy|Milan Malpensa Airport|true
+IST|Istanbul|Turkey|Istanbul Airport|true
+MUC|Munich|Germany|Munich Airport|true
+ZRH|Zurich|Switzerland|Zurich Airport|true
+
+# Middle East
+DXB|Dubai|UAE|Dubai International Airport|true
+DOH|Doha|Qatar|Hamad International Airport|true
+AUH|Abu Dhabi|UAE|Abu Dhabi International Airport|true
+
+# Asia
+SIN|Singapore|Singapore|Singapore Changi Airport|true
+HKG|Hong Kong|Hong Kong|Hong Kong International Airport|true
+NRT|Tokyo|Japan|Narita International Airport|true
+HND|Tokyo|Japan|Haneda Airport|true
+ICN|Seoul|South Korea|Incheon International Airport|true
+BKK|Bangkok|Thailand|Suvarnabhumi Airport|true
+KUL|Kuala Lumpur|Malaysia|Kuala Lumpur International Airport|true
+BOM|Mumbai|India|Chhatrapati Shivaji Maharaj International Airport|true
+DEL|Delhi|India|Indira Gandhi International Airport|true
+PEK|Beijing|China|Beijing Capital International Airport|true
+PVG|Shanghai|China|Shanghai Pudong International Airport|true
+
+# Canada
+YYZ|Toronto|Canada|Toronto Pearson International Airport|true
+YVR|Vancouver|Canada|Vancouver International Airport|true
+YUL|Montreal|Canada|Montréal-Pierre Elliott Trudeau International Airport|true
+
+# Oceania
+SYD|Sydney|Australia|Sydney Kingsford Smith Airport|true
+MEL|Melbourne|Australia|Melbourne Airport|true
+AKL|Auckland|New Zealand|Auckland Airport|true
+
+# Latin America
+GRU|São Paulo|Brazil|São Paulo/Guarulhos International Airport|true
+MEX|Mexico City|Mexico|Mexico City International Airport|true
+EZE|Buenos Aires|Argentina|Ministro Pistarini International Airport|true

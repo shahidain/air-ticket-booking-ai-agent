@@ -62,8 +62,6 @@ class FlightSearchAgent:
         # Direct OpenAI client for function calling
         self.client = OpenAI(api_key=settings.openai_api_key)
 
-        logger.info("Flight Search Agent initialized with airport lookup tools")
-
     def execute(self, user_prompt: str, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute the flight search agent logic.
@@ -75,12 +73,10 @@ class FlightSearchAgent:
         Returns:
             Updated state with flight search results
         """
-        logger.info(f"Flight Search Agent executing with prompt: {user_prompt}")
-
         try:
             # Step 1: Parse user request using LLM
             parsed_request = self._parse_user_request(user_prompt)
-            logger.info(
+            logger.debug(
                 f"Parsed request: {parsed_request.origin_code} -> "
                 f"{parsed_request.destination_code} on {parsed_request.departure_date}"
             )
@@ -97,7 +93,7 @@ class FlightSearchAgent:
             state["search_request"] = search_request.model_dump()
             state["user_prompt"] = user_prompt
 
-            logger.info(
+            logger.debug(
                 f"Found {len(flight_results.original_date_offers)} flights for requested date, "
                 f"{len(flight_results.alternative_offers)} cheaper alternative dates"
             )
@@ -167,8 +163,6 @@ Do not include any explanation, markdown formatting, or additional text. Return 
             }
         ]
 
-        logger.info("Starting LLM parsing with tool support...")
-
         # Run conversation with tool calls
         max_iterations = 10
         iteration = 0
@@ -205,19 +199,19 @@ Do not include any explanation, markdown formatting, or additional text. Return 
 
             # Check if the model wants to call tools
             if response_message.tool_calls and not use_json_mode:
-                logger.info(f"Agent is calling {len(response_message.tool_calls)} tool(s)...")
+                logger.debug(f"Agent is calling {len(response_message.tool_calls)} tool(s)...")
 
                 # Execute each tool call
                 for tool_call in response_message.tool_calls:
                     function_name = tool_call.function.name
                     function_args = json.loads(tool_call.function.arguments)
 
-                    logger.info(f"Calling tool: {function_name} with args: {function_args}")
+                    logger.debug(f"Calling tool: {function_name} with args: {function_args}")
 
                     # Execute the tool function
                     if function_name in self.tool_functions:
                         function_response = self.tool_functions[function_name](**function_args)
-                        logger.info(f"Tool response: {function_response}")
+                        logger.debug(f"Tool response: {function_response}")
 
                         # Add tool response to messages
                         messages.append({
@@ -232,12 +226,35 @@ Do not include any explanation, markdown formatting, or additional text. Return 
             else:
                 # No more tool calls - agent has final response
                 final_content = response_message.content
-                logger.info(f"Agent finished with final response")
+                logger.debug(f"Agent finished with final response")
 
                 # Parse the JSON response into our model
                 try:
                     # Try to parse as pure JSON first
                     parsed_data = json.loads(final_content)
+                    
+                    # Validate that required fields are not None
+                    required_fields = ["origin_code", "destination_code", "departure_date"]
+                    missing_or_none = [field for field in required_fields if not parsed_data.get(field)]
+                    
+                    if missing_or_none:
+                        error_msg = f"LLM returned None/missing values for: {', '.join(missing_or_none)}"
+                        logger.error(f"{error_msg}. Response: {final_content}")
+                        
+                        # If we still have iterations left, ask for clarification
+                        if iteration < max_iterations - 1:
+                            messages.append({
+                                "role": "user",
+                                "content": f"Error: {error_msg}. Please use the airport lookup tools to find the correct IATA codes and provide all required fields."
+                            })
+                            continue
+                        else:
+                            raise ValueError(
+                                f"Could not parse flight request. {error_msg}. "
+                                f"Please provide origin city, destination city, and departure date clearly. "
+                                f"Example: 'Book a flight from Mumbai to Delhi on November 20th'"
+                            )
+                    
                     parsed = ParsedFlightRequest.model_validate(parsed_data)
                     return parsed
                 except json.JSONDecodeError:

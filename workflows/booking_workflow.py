@@ -75,8 +75,6 @@ class BookingWorkflow:
 
     def __init__(self):
         """Initialize the workflow and all agents."""
-        logger.info("Initializing Booking Workflow...")
-
         # Initialize all agents
         self.search_agent = FlightSearchAgent()
         self.presentation_agent = FlightPresentationAgent()
@@ -86,8 +84,6 @@ class BookingWorkflow:
 
         # Build the workflow graph
         self.graph = self._build_graph()
-
-        logger.info("Booking Workflow initialized successfully")
 
     def _build_graph(self) -> StateGraph:
         """

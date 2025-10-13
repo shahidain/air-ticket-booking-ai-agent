@@ -38,7 +38,6 @@ class AmadeusClient:
                 client_secret=settings.amadeus_api_secret,
                 hostname=settings.amadeus_hostname
             )
-            logger.info("Amadeus client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Amadeus client: {e}")
             raise

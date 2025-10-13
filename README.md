@@ -8,10 +8,13 @@ A multi-agent AI system for automated flight ticket booking using **LangGraph**,
 - **AI Agent Tools**: Agents use tools like airport lookup for intelligent decision-making
 - **OpenAI Function Calling**: Agents dynamically call tools to resolve airport codes
 - **Intelligent Flight Search**: Automatically finds cheaper alternatives ±1 day
+- **Currency Conversion**: Automatic conversion to your local currency with real-time exchange rates
+- **Smart Flight Sorting**: Automatically detects preferences from your message (cheapest, direct, fastest, etc.)
 - **5 Specialized AI Agents**: Each handling a specific task
 - **Professional Ticket Generation**: LLM-powered ticket formatting
 - **LangGraph Orchestration**: State management and agent coordination
 - **Human-in-the-Loop**: User selection and confirmation at key steps
+- **Cancel Anytime**: Exit the program gracefully at any step
 
 ## 📋 System Architecture
 
@@ -177,6 +180,10 @@ AMADEUS_HOSTNAME=test  # Use 'test' for testing, 'production' for live
 # Application
 LOG_LEVEL=INFO
 ENVIRONMENT=development
+
+# Currency Configuration
+LOCAL_CURRENCY=USD  # Your preferred currency (USD, EUR, GBP, INR, etc.)
+ENABLE_CURRENCY_CONVERSION=true  # Enable automatic currency conversion
 ```
 
 #### Getting API Keys:
@@ -305,8 +312,47 @@ AMADEUS_HOSTNAME=test      # Free tier, test data
 # or
 AMADEUS_HOSTNAME=production  # Real bookings (charges apply)
 
+# Currency Configuration
+LOCAL_CURRENCY=USD         # Your preferred currency (USD, EUR, GBP, INR, AED, etc.)
+ENABLE_CURRENCY_CONVERSION=true  # Enable automatic currency conversion
+
 # Logging
 LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
+```
+
+### 💱 Currency Conversion
+
+The system automatically converts flight prices to your preferred local currency:
+
+**Supported Currencies:**
+- 🇺🇸 USD - US Dollar
+- 🇪🇺 EUR - Euro
+- 🇬🇧 GBP - British Pound
+- 🇮🇳 INR - Indian Rupee
+- 🇦🇪 AED - UAE Dirham
+- 🇨🇦 CAD - Canadian Dollar
+- 🇦🇺 AUD - Australian Dollar
+- 🇯🇵 JPY - Japanese Yen
+- 🇨🇳 CNY - Chinese Yuan
+- 🇸🇬 SGD - Singapore Dollar
+- And 10+ more currencies
+
+**Features:**
+- Real-time exchange rates from API
+- Fallback rates when offline
+- Automatic conversion of all prices
+- Currency symbols displayed correctly
+- Original currency preserved in data
+
+**How it works:**
+1. Set `LOCAL_CURRENCY` in `.env` file (e.g., `LOCAL_CURRENCY=INR`)
+2. System fetches latest exchange rates
+3. All flight prices automatically converted
+4. Prices displayed with proper currency symbols (₹, $, €, £, etc.)
+
+**Example:**
+```
+Flight found: $500 USD → Displayed as: ₹41,560 INR
 ```
 
 ## 📊 Data Models

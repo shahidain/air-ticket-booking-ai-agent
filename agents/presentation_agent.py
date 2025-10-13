@@ -15,6 +15,8 @@ import re
 from api.openai_client import OpenAIClient
 from models.flight_models import FlightSearchResponse, FlightOffer, AlternativeDateOffer
 from utils.logger import setup_logger
+from tools.currency_converter_tool import convert_currency, get_currency_symbol, format_price
+from config import settings
 
 logger = setup_logger(__name__)
 
@@ -30,7 +32,6 @@ class FlightPresentationAgent:
     def __init__(self):
         """Initialize the agent with OpenAI client."""
         self.openai_client = OpenAIClient()
-        logger.info("Flight Presentation Agent initialized")
 
     def execute(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -49,6 +50,10 @@ class FlightPresentationAgent:
             flight_results = FlightSearchResponse.model_validate(state["flight_results"])
             parsed_request = state["parsed_request"]
 
+            # Convert currencies if enabled
+            if settings.enable_currency_conversion:
+                flight_results = self._convert_currencies(flight_results)
+            
             # Auto-detect sorting preference from user message and sort flights
             sorted_offers = self._sort_flights_by_preference(flight_results.original_date_offers, state.get("user_prompt", ""))
             flight_results.original_date_offers = sorted_offers
@@ -98,6 +103,13 @@ class FlightPresentationAgent:
         output.append(f"\nRoute: {parsed_request['origin_city']} ({parsed_request['origin_code']}) → "
                      f"{parsed_request['destination_city']} ({parsed_request['destination_code']})")
         output.append(f"Date: {parsed_request['departure_date']}")
+        
+        # Show currency information if conversion is enabled
+        if settings.enable_currency_conversion and flight_results.original_date_offers:
+            display_currency = flight_results.original_date_offers[0].currency
+            currency_symbol = get_currency_symbol(display_currency)
+            output.append(f"💱 Prices shown in: {currency_symbol} {display_currency}")
+        
         output.append("\n")
 
         # Main flights table
@@ -197,6 +209,65 @@ class FlightPresentationAgent:
         output.append("   'Find cheapest flights...' | 'Direct flights only...' | 'Early morning flights...'")  
 
         return "\n".join(output)
+
+    def _convert_currencies(self, flight_results: FlightSearchResponse) -> FlightSearchResponse:
+        """
+        Convert all flight prices to the user's local currency.
+        
+        Args:
+            flight_results: Flight search results with original currencies
+            
+        Returns:
+            Flight search results with converted currencies
+        """
+        target_currency = settings.local_currency
+        
+        logger.info(f"Converting flight prices to {target_currency}")
+        
+        # Convert original date offers
+        converted_offers = []
+        for offer in flight_results.original_date_offers:
+            if offer.currency != target_currency:
+                converted_offer = offer.convert_currency(target_currency)
+                if converted_offer:
+                    converted_offers.append(converted_offer)
+                else:
+                    logger.warning(f"Failed to convert offer {offer.id}, keeping original currency")
+                    converted_offers.append(offer)
+            else:
+                converted_offers.append(offer)
+        
+        flight_results.original_date_offers = converted_offers
+        
+        # Convert alternative date offers
+        converted_alternatives = []
+        for alt in flight_results.alternative_offers:
+            converted_alt_offers = []
+            for offer in alt.offers:
+                if offer.currency != target_currency:
+                    converted_offer = offer.convert_currency(target_currency)
+                    if converted_offer:
+                        converted_alt_offers.append(converted_offer)
+                    else:
+                        converted_alt_offers.append(offer)
+                else:
+                    converted_alt_offers.append(offer)
+            
+            # Recalculate price difference in new currency
+            if converted_alt_offers and converted_offers:
+                min_alt_price = min(o.price for o in converted_alt_offers)
+                min_original_price = min(o.price for o in converted_offers)
+                new_price_diff = min_alt_price - min_original_price
+                
+                alt.offers = converted_alt_offers
+                alt.price_difference = new_price_diff
+                converted_alternatives.append(alt)
+        
+        flight_results.alternative_offers = converted_alternatives
+        
+        logger.debug(f"Currency conversion completed. All prices now in {target_currency}")
+        
+        return flight_results
 
     def _format_offers_list(self, offers: List[FlightOffer]) -> List[Dict[str, Any]]:
         """

@@ -13,6 +13,8 @@ from typing import Dict, Any
 from api.openai_client import OpenAIClient
 from models.flight_models import BookingConfirmation, FlightOffer, PassengerInfo
 from utils.logger import setup_logger
+from tools.currency_converter_tool import convert_currency, get_currency_symbol
+from config import settings
 
 logger = setup_logger(__name__)
 
@@ -28,7 +30,6 @@ class TicketGenerationAgent:
     def __init__(self):
         """Initialize the agent with OpenAI client."""
         self.openai_client = OpenAIClient()
-        logger.info("Ticket Generation Agent initialized")
 
     def execute(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -131,6 +132,23 @@ Make it professional and easy to read. Use proper spacing and alignment."""
         """
         flight = booking.flight_offer
 
+        # Convert currency if needed
+        display_price = booking.total_price
+        display_currency = booking.currency
+        
+        if settings.enable_currency_conversion and settings.local_currency != booking.currency:
+            try:
+                display_price = convert_currency(
+                    booking.total_price,
+                    booking.currency,
+                    settings.local_currency
+                )
+                display_currency = settings.local_currency
+            except Exception as e:
+                logger.warning(f"Currency conversion failed, using original currency: {e}")
+        
+        currency_symbol = get_currency_symbol(display_currency)
+
         # Get route information
         first_segment = flight.segments[0]
         last_segment = flight.segments[-1]
@@ -147,12 +165,14 @@ Make it professional and easy to read. Use proper spacing and alignment."""
                 "phone": passenger.phone
             })
 
-        # Format flight segments
+        # Format flight segments with full carrier name and code
         segments_formatted = []
         for i, segment in enumerate(flight.segments, start=1):
             segments_formatted.append({
                 "segment_number": i,
                 "carrier": f"{segment.carrier_name} ({segment.carrier_code})",
+                "carrier_full": segment.carrier_name,
+                "carrier_code": segment.carrier_code,
                 "flight_number": segment.flight_number,
                 "from": f"{segment.departure_airport}",
                 "to": f"{segment.arrival_airport}",
@@ -172,7 +192,7 @@ Make it professional and easy to read. Use proper spacing and alignment."""
             "total_duration": flight.total_duration,
             "stops": flight.number_of_stops,
             "booking_class": flight.booking_class,
-            "total_price": f"{booking.total_price} {booking.currency}",
+            "total_price": f"{currency_symbol}{display_price:.2f} {display_currency}",
             "carrier_summary": flight.get_carrier_names()
         }
 

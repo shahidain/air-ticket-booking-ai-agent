@@ -33,7 +33,6 @@ class BookingAgent:
     def __init__(self):
         """Initialize the agent with Amadeus client."""
         self.amadeus_client = AmadeusClient()
-        logger.info("Booking Agent initialized")
 
     def execute(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -1,5 +1,6 @@
 """
 Data models for flight information and booking.
+
 These Pydantic models ensure type safety and validation throughout the application.
 """
 
@@ -38,6 +39,51 @@ class FlightOffer(BaseModel):
         """Get comma-separated list of unique carrier names."""
         carriers = list(set(segment.carrier_name for segment in self.segments))
         return ", ".join(carriers)
+    
+    def convert_currency(self, target_currency: str) -> Optional['FlightOffer']:
+        """
+        Convert flight offer price to target currency.
+        
+        Args:
+            target_currency: Target currency code
+            
+        Returns:
+            New FlightOffer with converted price, or None if conversion fails
+        """
+        from tools.currency_converter_tool import convert_currency
+        
+        if self.currency == target_currency:
+            return self
+        
+        try:
+            converted_price = convert_currency(
+                self.price,
+                self.currency,
+                target_currency
+            )
+            
+            # Create a copy with converted price
+            offer_dict = self.model_dump()
+            offer_dict['price'] = converted_price
+            offer_dict['currency'] = target_currency
+            
+            return FlightOffer.model_validate(offer_dict)
+        except ValueError:
+            return None
+    
+    def get_formatted_price(self, show_code: bool = True) -> str:
+        """
+        Get formatted price with currency symbol.
+        
+        Args:
+            show_code: Whether to show currency code
+            
+        Returns:
+            Formatted price string
+        """
+        from tools.currency_converter_tool import format_price
+        
+        return format_price(self.price, self.currency, show_code)
 
 
 class FlightSearchRequest(BaseModel):

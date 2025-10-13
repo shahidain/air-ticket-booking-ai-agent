@@ -27,7 +27,6 @@ class NotificationAgent:
     def __init__(self):
         """Initialize the agent with OpenAI client."""
         self.openai_client = OpenAIClient()
-        logger.info("Notification Agent initialized")
 
     def execute(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
