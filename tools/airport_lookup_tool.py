@@ -3,7 +3,8 @@ Airport Lookup Tool
 
 This tool provides airport IATA codes and city names.
 Can be used by AI agents to resolve city names to airport codes.
-Fetches data from aviation-edge.com API or falls back to local cache.
+Fetches real-time data from Amadeus Location API and caches results.
+Falls back to local database if API is unavailable.
 """
 
 from typing import Dict, List, Optional
@@ -165,29 +166,80 @@ class AirportLookupTool:
             logger.warning(f"Failed to save airport cache: {e}")
     
     @classmethod
-    def _fetch_airports_from_amadeus(cls) -> bool:
+    def _fetch_airport_from_amadeus(cls, city_or_code: str) -> List[AirportInfo]:
         """
-        Fetch airports from Amadeus API.
-        
+        Fetch airport information from Amadeus API.
+
+        Uses the Amadeus Location Search API to find airports by city name or IATA code.
+
+        Args:
+            city_or_code: City name or IATA code to search
+
         Returns:
-            True if fetch was successful
+            List of AirportInfo objects found
         """
         try:
             from api.amadeus_client import AmadeusClient
-            
-            logger.info("Fetching airports from Amadeus API...")
+
+            logger.debug(f"Searching Amadeus API for airports: {city_or_code}")
             amadeus = AmadeusClient()
-            
-            # Note: Amadeus doesn't have a simple "get all airports" endpoint
-            # So we'll use the fallback data as our primary source
-            # In production, you could use a dedicated airports API
-            
-            logger.debug("Using fallback airports as Amadeus doesn't provide bulk airport data")
-            return False
-            
+
+            # Use Amadeus Reference Data API - Locations endpoint
+            response = amadeus.client.reference_data.locations.get(
+                keyword=city_or_code,
+                subType='AIRPORT'
+            )
+
+            airports = []
+
+            if response.data:
+                logger.debug(f"Found {len(response.data)} airports from Amadeus API")
+
+                for location in response.data:
+                    # Extract airport information
+                    iata_code = location.get('iataCode', '')
+
+                    if not iata_code:
+                        continue
+
+                    # Get address information
+                    address = location.get('address', {})
+                    city = address.get('cityName', '')
+                    country = address.get('countryName', '')
+
+                    # Airport name
+                    airport_name = location.get('name', f"{city} Airport")
+
+                    # Determine if major airport (Amadeus doesn't provide this directly)
+                    # Consider it major if it's in a major city or has "International" in name
+                    is_major = 'international' in airport_name.lower() or location.get('relevance', 0) > 5
+
+                    airport_info = AirportInfo(
+                        iata_code=iata_code,
+                        city=city,
+                        country=country,
+                        airport_name=airport_name,
+                        is_major=is_major
+                    )
+
+                    airports.append(airport_info)
+
+                    # Cache this airport for future use
+                    cls._airports_cache[iata_code] = airport_info
+
+                # Update cache timestamp if we got results
+                if airports:
+                    cls._cache_timestamp = datetime.now()
+                    cls._save_cache_to_file()
+
+                return airports
+            else:
+                logger.debug(f"No airports found in Amadeus API for: {city_or_code}")
+                return []
+
         except Exception as e:
-            logger.warning(f"Failed to fetch from Amadeus: {e}")
-            return False
+            logger.warning(f"Failed to fetch from Amadeus API: {e}")
+            return []
     
     @classmethod
     def _ensure_airports_loaded(cls) -> None:
@@ -220,19 +272,37 @@ class AirportLookupTool:
         """
         Get airport information by IATA code.
 
+        First checks cache, then tries Amadeus API if not found.
+
         Args:
             iata_code: 3-letter IATA code (e.g., "JFK")
 
         Returns:
             AirportInfo object or None if not found
         """
+        # Check cache first
         cls._ensure_airports_loaded()
-        return cls._airports_cache.get(iata_code.upper())
+        cached_airport = cls._airports_cache.get(iata_code.upper())
+
+        if cached_airport:
+            return cached_airport
+
+        # Try Amadeus API if not in cache
+        logger.debug(f"Airport code '{iata_code}' not in cache, trying Amadeus API")
+        amadeus_results = cls._fetch_airport_from_amadeus(iata_code)
+
+        if amadeus_results:
+            # Return the first result (should be exact match)
+            return amadeus_results[0]
+
+        return None
 
     @classmethod
     def search_by_city(cls, city_name: str) -> List[AirportInfo]:
         """
         Search for airports by city name.
+
+        First tries Amadeus API, then falls back to cache/fallback data.
 
         Args:
             city_name: City name to search for
@@ -240,6 +310,14 @@ class AirportLookupTool:
         Returns:
             List of matching airports
         """
+        # Try Amadeus API first
+        amadeus_results = cls._fetch_airport_from_amadeus(city_name)
+        if amadeus_results:
+            logger.info(f"Found {len(amadeus_results)} airports from Amadeus API for '{city_name}'")
+            return amadeus_results
+
+        # Fallback to cached/local data
+        logger.debug(f"No Amadeus results, searching local cache for '{city_name}'")
         cls._ensure_airports_loaded()
         city_name_lower = city_name.lower()
         results = []

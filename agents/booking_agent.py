@@ -120,16 +120,16 @@ class BookingAgent:
             print(f"Passenger {i + 1}:")
 
             # Basic information
-            first_name = input("  First Name (or 'cancel' to exit): ").strip()
+            first_name = input("  First Name (or 'cancel' to exit) [Demo: press Enter]: ").strip()
             if first_name.lower() in ['cancel', 'exit', 'quit']:
                 print("\n🚪 Booking cancelled by user. Thank you for using AI Ticket Booking!")
                 raise KeyboardInterrupt("User cancelled during passenger information collection")
             first_name = first_name or "John"
-            
-            last_name = input("  Last Name: ").strip() or "Doe"
-            gender = input("  Gender (M/F): ").strip().upper() or "M"
-            email = input("  Email: ").strip() or "john.doe@example.com"
-            phone = input("  Phone: ").strip() or "+91-1234567890"
+
+            last_name = input("  Last Name [Demo: press Enter]: ").strip() or "Doe"
+            gender = input("  Gender (M/F) [Demo: press Enter]: ").strip().upper() or "M"
+            email = input("  Email [Demo: press Enter]: ").strip() or "john.doe@example.com"
+            phone = input("  Phone [Demo: press Enter]: ").strip() or "+91-1234567890"
 
             # Government ID Information
             print("\n  Government ID (Default: AADHAAR)")
@@ -147,7 +147,11 @@ class BookingAgent:
             if id_type == "AADHAAR":
                 id_number = self._get_aadhaar_number()
             else:
-                id_number = input(f"  {id_type} Number: ").strip() or "DEFAULT123456"
+                id_number = input(f"  {id_type} Number (or 'cancel' to exit): ").strip()
+                if id_number.lower() in ['cancel', 'exit', 'quit']:
+                    print("\n🚪 Booking cancelled by user. Thank you for using AI Ticket Booking!")
+                    raise KeyboardInterrupt("User cancelled during ID collection")
+                id_number = id_number or "DEFAULT123456"
 
             passenger = PassengerInfo(
                 first_name=first_name,
