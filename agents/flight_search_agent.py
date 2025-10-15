@@ -136,6 +136,12 @@ Date handling:
 - "next Monday/Tuesday/etc" = next occurrence of that day
 - Specific dates should be in YYYY-MM-DD format
 
+Time handling (use null if not specified):
+- "early morning" / "morning" = null (let system find morning flights)
+- "afternoon" / "evening" / "night" = null (time preference, not specific time)
+- Specific time "3 PM" / "15:00" = convert to "15:00" in 24-hour format
+- No time mentioned = null
+
 Steps:
 1. First, call get_primary_airport for the origin city
 2. Then, call get_primary_airport for the destination city
@@ -148,15 +154,22 @@ CRITICAL: Your final response must be ONLY a JSON object with these exact fields
   "destination_city": "City name",
   "destination_code": "IATA code from tool",
   "departure_date": "YYYY-MM-DD",
-  "departure_time": "HH:MM or null",
+  "departure_time": null,
   "adults": 1,
   "travel_class": "ECONOMY"
 }
 
+IMPORTANT: 
+- Use null (not "null" string) for departure_time if no specific time is mentioned
+- Only use "HH:MM" format if user specifies exact time like "3 PM" or "15:00"
+- For time preferences like "morning" or "afternoon", use null
+
 Do not include any explanation, markdown formatting, or additional text. Return ONLY the JSON object."""
 
         messages = [
-            {"role": "system", "content": system_prompt},
+            {
+                "role": "system", 
+                "content": system_prompt},
             {
                 "role": "user",
                 "content": f"Current date: {datetime.now().strftime('%Y-%m-%d')}\n\nUser request: {user_prompt}"
@@ -310,17 +323,22 @@ Do not include any explanation, markdown formatting, or additional text. Return 
         # Parse date
         departure_date = date.fromisoformat(parsed.departure_date)
 
-        # Parse time if provided
+        # Parse time if provided (skip null, "null", empty strings)
         departure_time = None
-        if parsed.departure_time:
+        if parsed.departure_time and parsed.departure_time.lower() not in ['null', 'none', '']:
             try:
+                # Try to parse HH:MM format
                 time_parts = parsed.departure_time.split(":")
-                departure_time = time(
-                    hour=int(time_parts[0]),
-                    minute=int(time_parts[1])
-                )
-            except Exception as e:
-                logger.warning(f"Could not parse time '{parsed.departure_time}': {e}")
+                if len(time_parts) == 2:
+                    departure_time = time(
+                        hour=int(time_parts[0]),
+                        minute=int(time_parts[1])
+                    )
+                    logger.debug(f"Parsed departure time: {departure_time}")
+                else:
+                    logger.debug(f"Invalid time format '{parsed.departure_time}', skipping")
+            except (ValueError, AttributeError) as e:
+                logger.debug(f"Skipping time parsing for '{parsed.departure_time}': not a specific time")
 
         return FlightSearchRequest(
             origin=parsed.origin_code,
