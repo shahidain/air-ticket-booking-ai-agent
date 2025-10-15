@@ -6,15 +6,16 @@ This script initializes the booking workflow and handles user interactions.
 import asyncio
 import sys
 import io
+
+# Fix Windows console encoding issues - MUST be before any imports that might print
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 from workflows.booking_workflow import BookingWorkflow
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
-
-# Fix Windows console encoding issues
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 
 async def main():
