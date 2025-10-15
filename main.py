@@ -4,34 +4,41 @@ This script initializes the booking workflow and handles user interactions.
 """
 
 import asyncio
+import sys
+import io
 from workflows.booking_workflow import BookingWorkflow
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+# Fix Windows console encoding issues
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 
 async def main():
     """Main function to run the flight booking system."""
     print("\n" + "="*60)
-    print("✈️  WELCOME TO AI TICKET BOOKING SYSTEM")
+    print("WELCOME TO AI TICKET BOOKING SYSTEM")
     print("="*60)
-    print("🤖 I can help you find and book flights using natural language!")
-    print("💡 Examples:")
-    print("   • 'Find a cheap flight from New York to London'")
-    print("   • 'Book a direct flight from Delhi to Mumbai tomorrow'")
-    print("   • 'I need an early morning flight from Tokyo to Sydney'")
-    print("\n🚪 You can type 'cancel' at any time to exit the program")
+    print("I can help you find and book flights using natural language!")
+    print("Examples:")
+    print("   - 'Find a cheap flight from New York to London'")
+    print("   - 'Book a direct flight from Delhi to Mumbai tomorrow'")
+    print("   - 'I need an early morning flight from Tokyo to Sydney'")
+    print("\nYou can type 'cancel' at any time to exit the program")
     print("="*60)
 
     # Initialize the booking workflow
     workflow = BookingWorkflow()
 
     # Example user prompt
-    user_prompt = input("\n🎯 Enter your flight booking request: ").strip()
-    
+    user_prompt = input("\nEnter your flight booking request: ").strip()
+
     # Check for immediate cancel
     if user_prompt.lower() in ['cancel', 'exit', 'quit']:
-        print("\n👋 Goodbye! Come back anytime to book your flights.")
+        print("\nGoodbye! Come back anytime to book your flights.")
         return
 
     try:
@@ -46,7 +53,7 @@ async def main():
         print("\n" + "="*50)
         print("BOOKING CANCELLED")
         print("="*50)
-        print("👋 You can restart the program anytime to make a new booking.")
+        print("You can restart the program anytime to make a new booking.")
         
     except Exception as e:
         logger.error(f"Error during booking process: {e}")

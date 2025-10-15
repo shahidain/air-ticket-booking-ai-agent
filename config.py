@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     enable_currency_conversion: bool = True  # Enable automatic currency conversion
     exchange_rate_api_url: str = "https://open.er-api.com/v6/latest"  # Exchange rate API base URL
 
+    # Tax Configuration
+    gst_rate: float = 18.0  # GST/Tax rate in percentage (18% = 18.0)
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

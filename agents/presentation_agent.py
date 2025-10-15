@@ -53,7 +53,9 @@ class FlightPresentationAgent:
             # Convert currencies if enabled
             if settings.enable_currency_conversion:
                 flight_results = self._convert_currencies(flight_results)
-            
+                # Update state with converted prices
+                state["flight_results"] = flight_results.model_dump()
+
             # Auto-detect sorting preference from user message and sort flights
             sorted_offers = self._sort_flights_by_preference(flight_results.original_date_offers, state.get("user_prompt", ""))
             flight_results.original_date_offers = sorted_offers
@@ -109,7 +111,10 @@ class FlightPresentationAgent:
             display_currency = flight_results.original_date_offers[0].currency
             currency_symbol = get_currency_symbol(display_currency)
             output.append(f"💱 Prices shown in: {currency_symbol} {display_currency}")
-        
+
+        # Show GST notice
+        output.append(f"* {settings.gst_rate}% GST will be added to the fare price at checkout")
+
         output.append("\n")
 
         # Main flights table
@@ -126,7 +131,10 @@ class FlightPresentationAgent:
                 dept_time = first_segment.departure_time.split('T')[1][:5] if 'T' in first_segment.departure_time else first_segment.departure_time
                 arr_time = last_segment.arrival_time.split('T')[1][:5] if 'T' in last_segment.arrival_time else last_segment.arrival_time
 
-                carrier = offer.get_carrier_names()[:20]  # Truncate if too long
+                # Format carrier with code and name
+                carrier_code = first_segment.carrier_code
+                carrier_name = first_segment.carrier_name
+                carrier = f"{carrier_code} - {carrier_name}"[:22]  # Truncate if too long
                 departure = f"{dept_time} {first_segment.departure_airport}"
                 arrival = f"{arr_time} {last_segment.arrival_airport}"
                 
@@ -138,10 +146,10 @@ class FlightPresentationAgent:
                 
                 # Format class
                 class_short = offer.booking_class[:8] if offer.booking_class else "ECONOMY"
-                
-                # Format price with better alignment
-                price = f"{offer.currency} {offer.price:.2f}"
-                
+
+                # Format price with better alignment and asterisk
+                price = f"{offer.currency} {offer.price:.2f}*"
+
                 # Available seats
                 seats = str(offer.available_seats) if offer.available_seats else "N/A"
 
@@ -170,15 +178,17 @@ class FlightPresentationAgent:
                 # Format savings with currency symbol
                 savings = f"💰 -{abs(alt.price_difference):.2f}"
                 
-                carrier = cheapest.get_carrier_names()[:18]
+                # Format carrier with code and name
+                first_seg = cheapest.segments[0]
+                carrier = f"{first_seg.carrier_code} - {first_seg.carrier_name}"[:20]
                 
                 # Enhanced stops display
                 if cheapest.number_of_stops == 0:
                     stops_text = "✈️ Direct"
                 else:
                     stops_text = f"🔄 {cheapest.number_of_stops} stop{'s' if cheapest.number_of_stops > 1 else ''}"
-                
-                price = f"{cheapest.currency} {cheapest.price:.2f}"
+
+                price = f"{cheapest.currency} {cheapest.price:.2f}*"
 
                 output.append(f"│ {date_str:<12} │ {day_name:<10} │ {savings:<12} │ {carrier:<20} │ {cheapest.total_duration:<10} │ {stops_text:<10} │ {price:<15} │")
 
@@ -592,9 +602,10 @@ class FlightPresentationAgent:
         print(f"\n{'='*60}")
         print(f"✈️  DETAILED INFO - OPTION {option_num}")
         print(f"{'='*60}")
-        
+
         print(f"🏢 Carrier: {offer.get_carrier_names()}")
-        print(f"💰 Price: {offer.currency} {offer.price:.2f}")
+        print(f"💰 Base Fare: {offer.currency} {offer.price:.2f}*")
+        print(f"   * {settings.gst_rate}% GST will be added at checkout")
         print(f"🎫 Class: {offer.booking_class}")
         print(f"⏱️  Total Duration: {offer.total_duration}")
         print(f"🔄 Stops: {offer.number_of_stops}")
@@ -637,7 +648,8 @@ class FlightPresentationAgent:
         print(f"⏱️  Duration: {offer.total_duration}")
         print(f"🔄 Stops: {'Direct flight' if offer.number_of_stops == 0 else f'{offer.number_of_stops} stop(s)'}")
         print(f"🎫 Class: {offer.booking_class}")
-        print(f"💰 Total Price: {offer.currency} {offer.price:.2f}")
+        print(f"💰 Base Fare: {offer.currency} {offer.price:.2f}*")
+        print(f"   * {settings.gst_rate}% GST will be added at checkout")
         print(f"{'='*70}")
 
 

@@ -74,16 +74,40 @@ class FlightOffer(BaseModel):
     def get_formatted_price(self, show_code: bool = True) -> str:
         """
         Get formatted price with currency symbol.
-        
+
         Args:
             show_code: Whether to show currency code
-            
+
         Returns:
             Formatted price string
         """
         from tools.currency_converter_tool import format_price
-        
+
         return format_price(self.price, self.currency, show_code)
+
+    def calculate_gst(self, gst_rate: float) -> float:
+        """
+        Calculate GST amount on the base price.
+
+        Args:
+            gst_rate: GST rate in percentage (e.g., 18.0 for 18%)
+
+        Returns:
+            GST amount
+        """
+        return round(self.price * (gst_rate / 100), 2)
+
+    def get_total_with_gst(self, gst_rate: float) -> float:
+        """
+        Calculate total price including GST.
+
+        Args:
+            gst_rate: GST rate in percentage (e.g., 18.0 for 18%)
+
+        Returns:
+            Total price including GST
+        """
+        return round(self.price + self.calculate_gst(gst_rate), 2)
 
 
 class FlightSearchRequest(BaseModel):

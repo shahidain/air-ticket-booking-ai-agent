@@ -4,67 +4,63 @@ A multi-agent AI system for automated flight ticket booking using **LangGraph**,
 
 ## 🌟 Features
 
+### Core Features
 - **Natural Language Processing**: Book flights using plain English
-- **AI Agent Tools**: Agents use tools like airport lookup for intelligent decision-making
-- **OpenAI Function Calling**: Agents dynamically call tools to resolve airport codes
-- **Intelligent Flight Search**: Automatically finds cheaper alternatives ±1 day
-- **Currency Conversion**: Automatic conversion to your local currency with real-time exchange rates
-- **Smart Flight Sorting**: Automatically detects preferences from your message (cheapest, direct, fastest, etc.)
-- **5 Specialized AI Agents**: Each handling a specific task
-- **Professional Ticket Generation**: LLM-powered ticket formatting
+- **5 Specialized AI Agents**: Each handling a specific task with clear separation of concerns
 - **LangGraph Orchestration**: State management and agent coordination
+- **Professional Table Display**: Clean ASCII table format for flight results
 - **Human-in-the-Loop**: User selection and confirmation at key steps
-- **Cancel Anytime**: Exit the program gracefully at any step
+- **Safe Exit Options**: Cancel at any point with graceful shutdown
+
+### Advanced Capabilities
+- **Real-time Amadeus API Integration**:
+  - Live airport search via Amadeus Location API
+  - Flight search with real availability
+  - Automatic cheaper alternatives (±1 day)
+
+- **OpenAI Function Calling**:
+  - Agents dynamically call tools to resolve airport codes
+  - Intelligent parsing of natural language requests
+
+- **Smart Flight Sorting**:
+  - Auto-detects preferences from your message
+  - Sorts by: Price, Duration, Departure Time, Direct flights
+  - Keywords: "cheapest", "fastest", "direct", "early morning", etc.
+
+- **Currency Conversion**:
+  - Real-time exchange rates from API
+  - Automatic conversion to your local currency (INR, USD, EUR, GBP, etc.)
+  - Displays prices with proper currency symbols (₹, $, €, £)
+
+- **GST/Tax Calculation**:
+  - Configurable tax rate (default 18% GST for India)
+  - Shows base fare with asterisk during search
+  - Full price breakdown in final ticket (Base + GST = Total)
+
+- **Government ID Validation**:
+  - Supports AADHAAR, Passport, Driving License
+  - AADHAAR format validation (12 digits: 0000-0000-0000)
+  - Replaces Date of Birth for Indian compliance
 
 ## 📋 System Architecture
 
-```
-User Input
-    ↓
-┌───────────────────────────────────────────────────────────┐
-│  LangGraph Workflow Orchestrator                          │
-└───────────────────────────────────────────────────────────┘
-    ↓
-┌───────────────────────────────────────────────────────────┐
-│  Agent 1: Flight Search Agent (with Tools)                │
-│  - Parses natural language request using OpenAI           │
-│  - Uses airport lookup tool to resolve city → IATA codes  │
-│  - Extracts origin, destination, date, time               │
-│  - Searches flights via Amadeus API                       │
-│  - Finds cheaper alternatives (±1 day)                    │
-└───────────────────────────────────────────────────────────┘
-    ↓
-┌───────────────────────────────────────────────────────────┐
-│  Agent 2: Flight Presentation Agent                       │
-│  - Formats flight offers using LLM                        │
-│  - Shows carrier names, times, duration, prices           │
-│  - Presents alternatives with savings                     │
-│  - Asks user to select option                             │
-└───────────────────────────────────────────────────────────┘
-    ↓
-┌───────────────────────────────────────────────────────────┐
-│  Agent 3: Booking Agent                                   │
-│  - Collects passenger information                         │
-│  - Initiates booking via Amadeus API                      │
-│  - Returns booking confirmation                           │
-└───────────────────────────────────────────────────────────┘
-    ↓
-┌───────────────────────────────────────────────────────────┐
-│  Agent 4: Ticket Generation Agent                         │
-│  - Formats booking confirmation into ticket               │
-│  - Creates professional ticket document                   │
-│  - Includes PNR, flight details, passenger info           │
-└───────────────────────────────────────────────────────────┘
-    ↓
-┌───────────────────────────────────────────────────────────┐
-│  Agent 5: Notification Agent                              │
-│  - Delivers formatted ticket to user                      │
-│  - Shows booking reference and next steps                 │
-│  - (Production: sends email/SMS)                          │
-└───────────────────────────────────────────────────────────┘
-    ↓
-Booking Complete ✅
-```
+### Visual Architecture Diagram
+
+![AI Ticket Booking System Architecture](ARCHITECTURE.svg)
+
+
+## 📚 Documentation
+
+- **README.md** (this file): User guide and setup instructions
+- **[AGENTS.md](AGENTS.md)**: Complete technical guide for AI agents and developers
+  - Detailed agent specifications with code examples
+  - Data flow and state management
+  - API integration patterns
+  - Extension guide for adding new features
+  - Debugging tips and troubleshooting
+- **PROJECT_STRUCTURE.md**: File organization overview
+- **ARCHITECTURE.png**: Visual system architecture diagram
+- **FLOWCHART.png**: User workflow diagram
 
 ## 📁 Project Structure
 
@@ -93,7 +89,8 @@ AI-TICKET-BOOKING/
 │
 ├── tools/                       # Agent Tools
 │   ├── __init__.py
-│   └── airport_lookup_tool.py   # Airport code lookup (70+ airports)
+│   ├── airport_lookup_tool.py   # Amadeus Location API integration
+│   └── currency_converter_tool.py  # Real-time currency conversion
 │
 ├── models/                      # Data Models
 │   ├── __init__.py
@@ -110,14 +107,16 @@ AI-TICKET-BOOKING/
 
 ### 📊 File Count Summary
 
-- **Total application files**: 18 Python files
+- **Total application files**: 19 Python files
 - **Agents**: 5 files
 - **API clients**: 2 files
-- **Tools**: 1 file
+- **Tools**: 2 files (Airport Lookup, Currency Converter)
 - **Models**: 1 file
 - **Workflows**: 1 file
 - **Configuration**: 2 files (config.py, main.py)
 - **Utilities**: 1 file
+- **Diagrams**: 2 PNG files (Architecture, Flowchart)
+- **Documentation**: 3 MD files (README, AGENTS, Project Structure)
 
 ### 🏗️ Clean Architecture
 
@@ -182,8 +181,11 @@ LOG_LEVEL=INFO
 ENVIRONMENT=development
 
 # Currency Configuration
-LOCAL_CURRENCY=USD  # Your preferred currency (USD, EUR, GBP, INR, etc.)
+LOCAL_CURRENCY=INR  # Your preferred currency (USD, EUR, GBP, INR, etc.)
 ENABLE_CURRENCY_CONVERSION=true  # Enable automatic currency conversion
+
+# Tax Configuration
+GST_RATE=18.0  # GST/Tax rate in percentage (18% for India)
 ```
 
 #### Getting API Keys:
@@ -260,19 +262,35 @@ Each agent is isolated in its own file with a single responsibility:
 Reusable tools that agents can call using OpenAI function calling:
 
 - **`AirportLookupTool`**:
-  - Database of 70+ major airports worldwide
-  - `lookup_airport_by_code(iata_code)`: Get airport info by IATA code
-  - `lookup_airports_by_city(city_name)`: Find all airports in a city
-  - `get_primary_airport(city_name)`: Get main airport for a city
-  - Used by Flight Search Agent to resolve city names → IATA codes
+  - **Amadeus Location API Integration** (Real-time data)
+  - Searches airports dynamically via Amadeus API
+  - Functions:
+    - `lookup_airport_by_code(iata_code)`: Get airport info by IATA code
+    - `lookup_airports_by_city(city_name)`: Find all airports in a city
+    - `get_primary_airport(city_name)`: Get main airport for a city
+  - Real-time API calls only - no caching or fallback
+  - Used by Flight Search Agent with OpenAI function calling
+
+- **`CurrencyConverterTool`**:
+  - Real-time exchange rates from open API
+  - Functions:
+    - `convert_currency(amount, from, to)`: Convert between currencies
+    - `get_currency_symbol(code)`: Get currency symbol (₹, $, €, £)
+    - `format_price(amount, currency)`: Format price with symbol
+  - Cached rates (1 hour expiry)
+  - Fallback rates when offline
+  - Used by Presentation and Ticket Generation agents
 
 **Example Tool Usage:**
 ```python
-# When user says "New York", agent calls:
-get_primary_airport("New York")  # Returns: "JFK"
+# Flight Search Agent with OpenAI function calling:
+User: "Find flights from Mumbai to Delhi"
+Agent calls: get_primary_airport("Mumbai")  # → "BOM" (via Amadeus API)
+Agent calls: get_primary_airport("Delhi")   # → "DEL" (via Amadeus API)
 
-# When user says "London", agent calls:
-get_primary_airport("London")  # Returns: "LHR"
+# Currency Converter:
+convert_currency(305.50, "EUR", "INR")  # → 31,455.65
+format_price(31455.65, "INR")          # → "₹31,455.65 INR"
 ```
 
 ### API Clients (`api/`)
@@ -322,7 +340,7 @@ LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
 
 ### 💱 Currency Conversion
 
-The system automatically converts flight prices to your preferred local currency:
+The system automatically converts flight prices to your preferred local currency using real-time exchange rates.
 
 **Supported Currencies:**
 - 🇺🇸 USD - US Dollar
@@ -335,24 +353,58 @@ The system automatically converts flight prices to your preferred local currency
 - 🇯🇵 JPY - Japanese Yen
 - 🇨🇳 CNY - Chinese Yuan
 - 🇸🇬 SGD - Singapore Dollar
-- And 10+ more currencies
+- And 15+ more currencies
 
 **Features:**
-- Real-time exchange rates from API
-- Fallback rates when offline
-- Automatic conversion of all prices
-- Currency symbols displayed correctly
-- Original currency preserved in data
+- ✅ Real-time exchange rates from open API
+- ✅ Automatic conversion throughout entire flow
+- ✅ Currency symbols displayed correctly (₹, $, €, £)
+- ✅ Conversion persists in state for all agents
 
 **How it works:**
-1. Set `LOCAL_CURRENCY` in `.env` file (e.g., `LOCAL_CURRENCY=INR`)
-2. System fetches latest exchange rates
-3. All flight prices automatically converted
-4. Prices displayed with proper currency symbols (₹, $, €, £, etc.)
+1. Set `LOCAL_CURRENCY=INR` in `.env` file
+2. System fetches latest exchange rates in real-time
+3. All flight prices automatically converted before display
+4. Conversion saved to state for consistent pricing
+5. All views show local currency (search, details, confirmation, ticket)
 
-**Example:**
+**Example Flow:**
 ```
-Flight found: $500 USD → Displayed as: ₹41,560 INR
+Amadeus API → EUR 305.50
+             ↓ Exchange Rate: 1 EUR = 103.00 INR
+Display     → ₹31,455.65 INR
+```
+
+### 💰 GST/Tax Calculation
+
+Configurable tax calculation with full price breakdown in final ticket.
+
+**Features:**
+- ✅ Configurable GST rate (default 18% for India)
+- ✅ Base fare shown with asterisk (*) during search
+- ✅ GST notice displayed: "* 18% GST will be added at checkout"
+- ✅ Full breakdown in final ticket (Base + GST = Total)
+
+**Configuration:**
+```env
+GST_RATE=18.0  # Change to any percentage (5%, 12%, 18%, etc.)
+```
+
+**Display Example:**
+
+During Flight Search:
+```
+💰 Base Fare: ₹31,455.65*
+   * 18% GST will be added at checkout
+```
+
+Final Ticket:
+```
+Price Breakdown:
+  Base Fare:    ₹31,455.65
+  GST (18%):    ₹5,662.02
+  ─────────────────────────
+  Total Amount: ₹37,117.67
 ```
 
 ## 📊 Data Models
@@ -371,7 +423,7 @@ All data is validated using **Pydantic** models in `models/flight_models.py`:
 The system includes:
 - API error handling (rate limits, timeouts)
 - Input validation (Pydantic models)
-- Graceful fallbacks
+- Exception propagation for critical failures
 - Comprehensive logging
 
 ## 🚦 Development Status

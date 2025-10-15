@@ -3,12 +3,11 @@ Currency Converter Tool
 
 This tool provides currency conversion functionality for flight prices.
 Can be used as a standalone function or by AI agents for currency conversion.
+Fetches real-time exchange rates from API only.
 """
 
 import requests
-import os
 from typing import Dict, Optional
-from datetime import datetime, timedelta
 from utils.logger import setup_logger
 from config import settings
 
@@ -17,78 +16,24 @@ logger = setup_logger(__name__)
 
 class CurrencyConverterTool:
     """
-    Currency converter tool with caching to minimize API calls.
+    Currency converter tool using real-time API calls.
     
-    Uses exchangerate-api.com for free exchange rates.
+    Uses exchangerate-api.com for live exchange rates.
     """
-    
-    # Cache for exchange rates
-    _rates_cache: Dict[str, float] = {}
-    _cache_timestamp: Optional[datetime] = None
-    _cache_duration = timedelta(hours=1)  # Cache rates for 1 hour
-    
-    # Fallback exchange rates (loaded from file)
-    FALLBACK_RATES: Dict[str, float] = {}
-    
+
     @classmethod
-    def _load_fallback_rates(cls) -> Dict[str, float]:
-        """
-        Load fallback exchange rates from data file.
-        
-        Returns:
-            Dictionary of currency codes to rates
-        """
-        if cls.FALLBACK_RATES:
-            return cls.FALLBACK_RATES
-        
-        rates = {}
-        fallback_file = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "data",
-            "fallback_exchange_rates.txt"
-        )
-        
-        try:
-            with open(fallback_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    # Skip comments and empty lines
-                    if not line or line.startswith('#'):
-                        continue
-                    
-                    # Parse rate line (format: CURRENCY_CODE=RATE)
-                    if '=' in line:
-                        code, rate = line.split('=', 1)
-                        rates[code.strip()] = float(rate.strip())
-            
-            logger.debug(f"Loaded {len(rates)} fallback exchange rates from file")
-            cls.FALLBACK_RATES = rates
-            return rates
-            
-        except FileNotFoundError:
-            logger.error(f"Fallback rates file not found: {fallback_file}")
-            # Return minimal fallback
-            return {"USD": 1.0, "EUR": 0.92, "GBP": 0.79, "INR": 83.12}
-        except Exception as e:
-            logger.error(f"Error loading fallback rates: {e}")
-            return {"USD": 1.0, "EUR": 0.92, "GBP": 0.79, "INR": 83.12}
-    
-    @classmethod
-    def _should_refresh_cache(cls) -> bool:
-        """Check if cache should be refreshed."""
-        if cls._cache_timestamp is None:
-            return True
-        
-        time_since_cache = datetime.now() - cls._cache_timestamp
-        return time_since_cache > cls._cache_duration
-    
-    @classmethod
-    def _fetch_exchange_rates(cls, base_currency: str = "USD") -> None:
+    def _fetch_exchange_rates(cls, base_currency: str = "USD") -> Dict[str, float]:
         """
         Fetch current exchange rates from API.
         
         Args:
             base_currency: Base currency for rates (default: USD)
+            
+        Returns:
+            Dictionary of currency codes to rates
+            
+        Raises:
+            Exception: If API call fails
         """
         try:
             # Get API URL from config
@@ -102,93 +47,59 @@ class CurrencyConverterTool:
                 data = response.json()
                 
                 if data.get("result") == "success":
-                    cls._rates_cache = data.get("rates", {})
-                    cls._cache_timestamp = datetime.now()
-                    logger.info(
-                        f"Successfully fetched {len(cls._rates_cache)} exchange rates"
-                    )
+                    rates = data.get("rates", {})
+                    logger.debug(f"Successfully fetched {len(rates)} exchange rates")
+                    return rates
                 else:
-                    logger.warning("API returned unsuccessful result")
-                    cls._use_fallback_rates()
+                    error_msg = f"API returned unsuccessful result: {data.get('error-type', 'unknown error')}"
+                    logger.error(error_msg)
+                    raise Exception(error_msg)
             else:
-                logger.warning(
-                    f"Failed to fetch exchange rates: HTTP {response.status_code}"
-                )
-                cls._use_fallback_rates()
+                error_msg = f"Failed to fetch exchange rates: HTTP {response.status_code}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
                 
         except requests.RequestException as e:
-            logger.warning(f"Error fetching exchange rates: {e}")
-            cls._use_fallback_rates()
-        except Exception as e:
-            logger.error(f"Unexpected error fetching exchange rates: {e}")
-            cls._use_fallback_rates()
-    
-    @classmethod
-    def _use_fallback_rates(cls) -> None:
-        """Use fallback rates when API is unavailable."""
-        fallback_rates = cls._load_fallback_rates()
-        cls._rates_cache = fallback_rates.copy()
-        cls._cache_timestamp = datetime.now()
-        logger.info("Using fallback exchange rates")
-    
-    @classmethod
-    def _get_fallback_rate(
-        cls,
-        from_currency: str,
-        to_currency: str
-    ) -> Optional[float]:
-        """
-        Get exchange rate from fallback rates.
-        
-        Args:
-            from_currency: Source currency code
-            to_currency: Target currency code
-            
-        Returns:
-            Exchange rate, or None if not available
-        """
-        fallback_rates = cls._load_fallback_rates()
-        
-        if from_currency in fallback_rates and to_currency in fallback_rates:
-            from_rate = fallback_rates[from_currency]
-            to_rate = fallback_rates[to_currency]
-            return to_rate / from_rate
-        
-        logger.error(
-            f"No fallback rate available for {from_currency} to {to_currency}"
-        )
-        return None
+            error_msg = f"Error fetching exchange rates: {e}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
     
     @classmethod
     def get_exchange_rate(
         cls,
         from_currency: str,
         to_currency: str
-    ) -> Optional[float]:
+    ) -> float:
         """
-        Get exchange rate from one currency to another.
+        Get exchange rate from one currency to another using real-time API.
         
         Args:
             from_currency: Source currency code
             to_currency: Target currency code
             
         Returns:
-            Exchange rate, or None if not available
+            Exchange rate
+            
+        Raises:
+            Exception: If API call fails or currencies not found
         """
-        # Check if cache is valid
-        if cls._should_refresh_cache():
-            cls._fetch_exchange_rates(from_currency)
+        # Fetch fresh rates from API
+        rates = cls._fetch_exchange_rates(from_currency)
         
-        # Try to get rate from cache
-        if from_currency in cls._rates_cache and to_currency in cls._rates_cache:
-            # Convert via USD as base
-            from_rate = cls._rates_cache[from_currency]
-            to_rate = cls._rates_cache[to_currency]
+        # Try to get rate from response
+        if from_currency in rates and to_currency in rates:
+            # Convert via base currency
+            from_rate = rates[from_currency]
+            to_rate = rates[to_currency]
             return to_rate / from_rate
         
-        # Fallback to hardcoded rates
-        logger.warning("Using fallback exchange rates")
-        return cls._get_fallback_rate(from_currency, to_currency)
+        # If conversion is direct (from base currency)
+        if to_currency in rates:
+            return rates[to_currency]
+        
+        error_msg = f"Exchange rate not available for {from_currency} to {to_currency}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
     
     @classmethod
     def get_currency_symbol(cls, currency_code: str) -> str:
@@ -258,7 +169,7 @@ def convert_currency(
     target_currency: str
 ) -> float:
     """
-    Convert amount from source currency to target currency.
+    Convert amount from source currency to target currency using real-time rates.
     
     This is the main tool function that can be called by agents or used directly.
     
@@ -289,23 +200,23 @@ def convert_currency(
         logger.debug(f"No conversion needed: {source_currency} == {target_currency}")
         return amount
     
-    # Get exchange rate
-    rate = CurrencyConverterTool.get_exchange_rate(source_currency, target_currency)
-    
-    if rate is None:
-        error_msg = f"Could not get exchange rate for {source_currency} to {target_currency}"
+    try:
+        # Get exchange rate from API
+        rate = CurrencyConverterTool.get_exchange_rate(source_currency, target_currency)
+        
+        # Convert amount
+        converted_amount = amount * rate
+        
+        logger.debug(
+            f"Converted {amount:.2f} {source_currency} to "
+            f"{converted_amount:.2f} {target_currency} (rate: {rate:.4f})"
+        )
+        
+        return round(converted_amount, 2)
+    except Exception as e:
+        error_msg = f"Could not get exchange rate for {source_currency} to {target_currency}: {e}"
         logger.error(error_msg)
         raise ValueError(error_msg)
-    
-    # Convert amount
-    converted_amount = amount * rate
-    
-    logger.debug(
-        f"Converted {amount:.2f} {source_currency} to "
-        f"{converted_amount:.2f} {target_currency} (rate: {rate:.4f})"
-    )
-    
-    return round(converted_amount, 2)
 
 
 def get_currency_symbol(currency_code: str) -> str:

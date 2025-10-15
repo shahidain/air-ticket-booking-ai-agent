@@ -3,17 +3,12 @@ Airport Lookup Tool
 
 This tool provides airport IATA codes and city names.
 Can be used by AI agents to resolve city names to airport codes.
-Fetches real-time data from Amadeus Location API and caches results.
-Falls back to local database if API is unavailable.
+Fetches real-time data from Amadeus Location API only.
 """
 
-from typing import Dict, List, Optional
-import requests
-from datetime import datetime, timedelta
+from typing import List, Optional
 from pydantic import BaseModel, Field
 from utils.logger import setup_logger
-import os
-import json
 
 logger = setup_logger(__name__)
 
@@ -32,139 +27,9 @@ class AirportLookupTool:
     """
     Tool for looking up airport information.
 
-    Fetches data from Amadeus API or uses cached fallback data.
-    Caches results to minimize API calls.
+    Fetches data from Amadeus API in real-time.
     """
 
-    # Cache for API results
-    _airports_cache: Dict[str, AirportInfo] = {}
-    _cache_timestamp: Optional[datetime] = None
-    _cache_duration = timedelta(days=7)  # Cache airports for 7 days
-    
-    # Fallback airport database (loaded from file)
-    FALLBACK_AIRPORTS: Dict[str, AirportInfo] = {}
-    
-    @classmethod
-    def _load_fallback_airports(cls) -> Dict[str, AirportInfo]:
-        """
-        Load fallback airports from data file.
-        
-        Returns:
-            Dictionary of IATA codes to AirportInfo objects
-        """
-        if cls.FALLBACK_AIRPORTS:
-            return cls.FALLBACK_AIRPORTS
-        
-        airports = {}
-        fallback_file = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "data",
-            "fallback_airports.txt"
-        )
-        
-        try:
-            with open(fallback_file, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    # Skip comments and empty lines
-                    if not line or line.startswith('#'):
-                        continue
-                    
-                    # Parse airport line (format: IATA|CITY|COUNTRY|NAME|IS_MAJOR)
-                    if '|' in line:
-                        parts = line.split('|')
-                        if len(parts) >= 5:
-                            iata_code = parts[0].strip()
-                            city = parts[1].strip()
-                            country = parts[2].strip()
-                            airport_name = parts[3].strip()
-                            is_major = parts[4].strip().lower() == 'true'
-                            
-                            airports[iata_code] = AirportInfo(
-                                iata_code=iata_code,
-                                city=city,
-                                country=country,
-                                airport_name=airport_name,
-                                is_major=is_major
-                            )
-            
-            logger.debug(f"Loaded {len(airports)} fallback airports from file")
-            cls.FALLBACK_AIRPORTS = airports
-            return airports
-            
-        except FileNotFoundError:
-            error_msg = f"Critical error: Fallback airports file not found at {fallback_file}. Please ensure the data/fallback_airports.txt file exists."
-            logger.error(error_msg)
-            raise FileNotFoundError(error_msg)
-            
-        except Exception as e:
-            error_msg = f"Critical error loading fallback airports: {e}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
-    
-    @classmethod
-    def _get_cache_file_path(cls) -> str:
-        """Get the path to the airports cache file."""
-        return os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "data",
-            "airports_cache.json"
-        )
-    
-    @classmethod
-    def _load_cache_from_file(cls) -> bool:
-        """
-        Load airports cache from file.
-        
-        Returns:
-            True if cache was loaded successfully
-        """
-        cache_file = cls._get_cache_file_path()
-        
-        try:
-            if os.path.exists(cache_file):
-                with open(cache_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    
-                # Check if cache is still valid
-                cache_time = datetime.fromisoformat(data.get('timestamp', '2000-01-01'))
-                if datetime.now() - cache_time < cls._cache_duration:
-                    # Load airports from cache
-                    for code, airport_data in data.get('airports', {}).items():
-                        cls._airports_cache[code] = AirportInfo.model_validate(airport_data)
-                    
-                    cls._cache_timestamp = cache_time
-                    logger.debug(f"Loaded {len(cls._airports_cache)} airports from cache")
-                    return True
-                else:
-                    logger.debug("Airport cache expired")
-                    return False
-        except Exception as e:
-            logger.warning(f"Failed to load airport cache: {e}")
-            
-        return False
-    
-    @classmethod
-    def _save_cache_to_file(cls) -> None:
-        """Save airports cache to file."""
-        cache_file = cls._get_cache_file_path()
-        
-        try:
-            # Ensure data directory exists
-            os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-            
-            data = {
-                'timestamp': cls._cache_timestamp.isoformat() if cls._cache_timestamp else datetime.now().isoformat(),
-                'airports': {code: airport.model_dump() for code, airport in cls._airports_cache.items()}
-            }
-            
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2)
-                
-            logger.debug(f"Saved {len(cls._airports_cache)} airports to cache")
-        except Exception as e:
-            logger.warning(f"Failed to save airport cache: {e}")
-    
     @classmethod
     def _fetch_airport_from_amadeus(cls, city_or_code: str) -> List[AirportInfo]:
         """
@@ -224,55 +89,19 @@ class AirportLookupTool:
 
                     airports.append(airport_info)
 
-                    # Cache this airport for future use
-                    cls._airports_cache[iata_code] = airport_info
-
-                # Update cache timestamp if we got results
-                if airports:
-                    cls._cache_timestamp = datetime.now()
-                    cls._save_cache_to_file()
-
                 return airports
             else:
                 logger.debug(f"No airports found in Amadeus API for: {city_or_code}")
                 return []
 
         except Exception as e:
-            logger.warning(f"Failed to fetch from Amadeus API: {e}")
-            return []
-    
-    @classmethod
-    def _ensure_airports_loaded(cls) -> None:
-        """Ensure airports are loaded (from cache, API, or fallback)."""
-        # If cache is already loaded and valid, return
-        if cls._airports_cache and cls._cache_timestamp:
-            time_since_cache = datetime.now() - cls._cache_timestamp
-            if time_since_cache < cls._cache_duration:
-                return
-        
-        # Try to load from file cache
-        if cls._load_cache_from_file():
-            return
-        
-        # Try to fetch from API (currently not implemented for Amadeus)
-        # if cls._fetch_airports_from_amadeus():
-        #     cls._cache_timestamp = datetime.now()
-        #     cls._save_cache_to_file()
-        #     return
-        
-        # Use fallback data from file
-        logger.debug("Using fallback airport database from file")
-        fallback_airports = cls._load_fallback_airports()
-        cls._airports_cache = fallback_airports.copy()
-        cls._cache_timestamp = datetime.now()
-        cls._save_cache_to_file()
+            logger.error(f"Failed to fetch from Amadeus API: {e}")
+            raise
 
     @classmethod
     def get_airport_by_code(cls, iata_code: str) -> Optional[AirportInfo]:
         """
-        Get airport information by IATA code.
-
-        First checks cache, then tries Amadeus API if not found.
+        Get airport information by IATA code using Amadeus API.
 
         Args:
             iata_code: 3-letter IATA code (e.g., "JFK")
@@ -280,29 +109,19 @@ class AirportLookupTool:
         Returns:
             AirportInfo object or None if not found
         """
-        # Check cache first
-        cls._ensure_airports_loaded()
-        cached_airport = cls._airports_cache.get(iata_code.upper())
-
-        if cached_airport:
-            return cached_airport
-
-        # Try Amadeus API if not in cache
-        logger.debug(f"Airport code '{iata_code}' not in cache, trying Amadeus API")
+        logger.debug(f"Fetching airport '{iata_code}' from Amadeus API")
         amadeus_results = cls._fetch_airport_from_amadeus(iata_code)
 
         if amadeus_results:
-            # Return the first result (should be exact match)
             return amadeus_results[0]
 
+        logger.warning(f"Airport '{iata_code}' not found in Amadeus API")
         return None
 
     @classmethod
     def search_by_city(cls, city_name: str) -> List[AirportInfo]:
         """
-        Search for airports by city name.
-
-        First tries Amadeus API, then falls back to cache/fallback data.
+        Search for airports by city name using Amadeus API.
 
         Args:
             city_name: City name to search for
@@ -310,28 +129,20 @@ class AirportLookupTool:
         Returns:
             List of matching airports
         """
-        # Try Amadeus API first
+        logger.info(f"Searching for airports in '{city_name}' via Amadeus API")
         amadeus_results = cls._fetch_airport_from_amadeus(city_name)
+        
         if amadeus_results:
             logger.info(f"Found {len(amadeus_results)} airports from Amadeus API for '{city_name}'")
-            return amadeus_results
+        else:
+            logger.warning(f"No airports found for '{city_name}' in Amadeus API")
 
-        # Fallback to cached/local data
-        logger.debug(f"No Amadeus results, searching local cache for '{city_name}'")
-        cls._ensure_airports_loaded()
-        city_name_lower = city_name.lower()
-        results = []
-
-        for airport in cls._airports_cache.values():
-            if city_name_lower in airport.city.lower():
-                results.append(airport)
-
-        return results
+        return amadeus_results
 
     @classmethod
     def get_primary_airport_for_city(cls, city_name: str) -> Optional[AirportInfo]:
         """
-        Get the primary/major airport for a city.
+        Get the primary/major airport for a city using Amadeus API.
 
         If multiple airports exist, returns the first major one.
 
@@ -349,35 +160,6 @@ class AirportLookupTool:
         # Return first major airport, or first airport if no major ones
         major_airports = [a for a in airports if a.is_major]
         return major_airports[0] if major_airports else airports[0]
-
-    @classmethod
-    def search_by_country(cls, country_name: str) -> List[AirportInfo]:
-        """
-        Get all airports in a country.
-
-        Args:
-            country_name: Country name
-
-        Returns:
-            List of airports in that country
-        """
-        cls._ensure_airports_loaded()
-        country_lower = country_name.lower()
-        return [
-            airport for airport in cls._airports_cache.values()
-            if country_lower in airport.country.lower()
-        ]
-
-    @classmethod
-    def get_all_airports(cls) -> List[AirportInfo]:
-        """
-        Get all airports in the database.
-
-        Returns:
-            List of all airports
-        """
-        cls._ensure_airports_loaded()
-        return list(cls._airports_cache.values())
 
     @classmethod
     def format_airports_list(cls, airports: List[AirportInfo]) -> str:
@@ -450,6 +232,7 @@ def get_primary_airport(city_name: str) -> str:
     Get the primary airport IATA code for a city.
 
     This is useful for flight searches when you need a single airport code.
+    If multiple airports are found, prompts the user to select one.
 
     Args:
         city_name: Name of the city
@@ -457,12 +240,42 @@ def get_primary_airport(city_name: str) -> str:
     Returns:
         IATA code of primary airport or error message
     """
-    airport = AirportLookupTool.get_primary_airport_for_city(city_name)
-
-    if airport:
-        return airport.iata_code
-    else:
+    airports = AirportLookupTool.search_by_city(city_name)
+    
+    if not airports:
         return f"No airport found for '{city_name}'."
+    
+    # If only one airport, return it directly
+    if len(airports) == 1:
+        return airports[0].iata_code
+    
+    # Multiple airports found - ask user to select
+    print(f"\n🛫 Multiple airports found for '{city_name}':")
+    print("=" * 70)
+    for idx, airport in enumerate(airports, 1):
+        major_tag = " ⭐ [MAJOR]" if airport.is_major else ""
+        print(f"{idx}. {airport.iata_code} - {airport.airport_name}{major_tag}")
+        print(f"   📍 {airport.city}, {airport.country}")
+        print()
+    
+    while True:
+        try:
+            choice = input(f"Select airport (1-{len(airports)}) or 'cancel' to exit: ").strip()
+            
+            if choice.lower() in ['cancel', 'exit', 'quit']:
+                raise KeyboardInterrupt("User cancelled airport selection")
+            
+            choice_num = int(choice)
+            if 1 <= choice_num <= len(airports):
+                selected_airport = airports[choice_num - 1]
+                print(f"✅ Selected: {selected_airport.iata_code} - {selected_airport.airport_name}\n")
+                return selected_airport.iata_code
+            else:
+                print(f"❌ Invalid choice. Please enter a number between 1 and {len(airports)}")
+        except ValueError:
+            print("❌ Invalid input. Please enter a number.")
+        except KeyboardInterrupt:
+            raise
 
 
 # Export tool definitions for LangChain/OpenAI function calling

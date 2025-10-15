@@ -98,8 +98,10 @@ Your ticket should include:
    - Duration
    - Number of stops
    - Booking class
-6. **Price Information**:
-   - Total price with currency
+6. **Price Breakdown** (IMPORTANT - Show all three lines):
+   - Base Fare: [amount]
+   - GST ([rate]): [amount]
+   - Total Amount: [amount] (in bold or highlighted)
    - Booking date
 7. **Important Information Section**:
    - Check-in opens 24 hours before departure
@@ -110,7 +112,8 @@ Your ticket should include:
 Format it to look like a real airline ticket with clear sections, borders made with characters like ═, ║, ─.
 Use emojis appropriately for visual appeal.
 
-Make it professional and easy to read. Use proper spacing and alignment."""
+Make it professional and easy to read. Use proper spacing and alignment.
+IMPORTANT: Always show the price breakdown with base fare, GST amount, and total separately."""
 
         formatted_ticket = self.openai_client.format_response(
             data=ticket_data,
@@ -135,7 +138,7 @@ Make it professional and easy to read. Use proper spacing and alignment."""
         # Convert currency if needed
         display_price = booking.total_price
         display_currency = booking.currency
-        
+
         if settings.enable_currency_conversion and settings.local_currency != booking.currency:
             try:
                 display_price = convert_currency(
@@ -146,7 +149,11 @@ Make it professional and easy to read. Use proper spacing and alignment."""
                 display_currency = settings.local_currency
             except Exception as e:
                 logger.warning(f"Currency conversion failed, using original currency: {e}")
-        
+
+        # Calculate GST
+        gst_amount = round(display_price * (settings.gst_rate / 100), 2)
+        total_with_gst = round(display_price + gst_amount, 2)
+
         currency_symbol = get_currency_symbol(display_currency)
 
         # Get route information
@@ -192,7 +199,10 @@ Make it professional and easy to read. Use proper spacing and alignment."""
             "total_duration": flight.total_duration,
             "stops": flight.number_of_stops,
             "booking_class": flight.booking_class,
-            "total_price": f"{currency_symbol}{display_price:.2f} {display_currency}",
+            "base_fare": f"{currency_symbol}{display_price:.2f} {display_currency}",
+            "gst_rate": f"{settings.gst_rate}%",
+            "gst_amount": f"{currency_symbol}{gst_amount:.2f} {display_currency}",
+            "total_price": f"{currency_symbol}{total_with_gst:.2f} {display_currency}",
             "carrier_summary": flight.get_carrier_names()
         }
 
